@@ -9,7 +9,7 @@ class Tile(qtw.QPushButton):
     flagged = qtc.pyqtSignal(bool)
     def __init__(self, row, column, value=None):
         super().__init__()
-        self.setStyleSheet("margin: -1; ")
+        self.setStyleSheet("margin: -1;")
         self.setSizePolicy(qtw.QSizePolicy.Expanding, qtw.QSizePolicy.Expanding)
         self.clicked.connect(self.coord_signal_function)
         self.row = row

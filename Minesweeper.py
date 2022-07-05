@@ -8,9 +8,11 @@ import os
 
 from Tile import Tile
 
+
 class Minesweeper(qtw.QMainWindow):
     path = os.getcwd()
     os.chdir(path)
+    # set it to easy first!
     ROWS = 8
     COL = 10
     BOMBS = 10
@@ -58,15 +60,6 @@ class Minesweeper(qtw.QMainWindow):
         # self.button = qtw.QPushButton()
         self.main_layout.addWidget(self.game_widget, 5)
 
-
-
-
-        # for row in range(self.ROWS):
-        #     current = []
-        #     for column in range(self.COL):
-        #         current.append(Tile(row, column, self.symbols['tile']))
-        #     self.board.append(current)
-        # print(self.board)
         self.show()
 
     def create_header(self):
@@ -104,7 +97,6 @@ class Minesweeper(qtw.QMainWindow):
         self.game_info_layout.addWidget(self.flag_label, 1, 3, 1, 1, alignment=qtc.Qt.AlignRight)
         self.header.layout().addWidget(self.game_info_widget)
 
-
     def create_timer(self):
         self.timer_widget = qtw.QWidget()
         self.timer_widget.setLayout(qtw.QHBoxLayout())
@@ -128,7 +120,7 @@ class Minesweeper(qtw.QMainWindow):
     # method called by timer
     # https://www.geeksforgeeks.org/pyqt5-digital-stopwatch/
     def showTime(self):
-        self.seconds_count+=1
+        self.seconds_count += 1
         # getting text from seconds_count
         text = str(self.seconds_count)
         # idk how to do a real string buffer appropriately
@@ -142,8 +134,6 @@ class Minesweeper(qtw.QMainWindow):
         self.timer_label.setText(text)
         return
 
-
-
     def difficulty_list(self):
         diff_list = qtw.QComboBox()
         diff_list.setSizePolicy(qtw.QSizePolicy.Maximum, qtw.QSizePolicy.Maximum)
@@ -155,7 +145,6 @@ class Minesweeper(qtw.QMainWindow):
     def update_difficulty(self, text):
         self.ROWS, self.COL, self.BOMBS = self.DIFFICULTY[text]
         self.reset_board()
-
 
     def create_tiles(self):
         self.grid_layout.setSpacing(0)
@@ -183,11 +172,10 @@ class Minesweeper(qtw.QMainWindow):
         self.is_first_move = True
         self.create_tiles()
         self.timer_label.setText("000")
-        self.seconds_count=0
-        self.flag_counter=self.BOMBS
+        self.seconds_count = 0
+        self.flag_counter = self.BOMBS
         self.flag_label.setText(f"Flag: {self.flag_counter}")
         self.timer.stop()
-
 
     def pretty_print_board(self):
         # two spaces for the buffer
@@ -281,13 +269,14 @@ class Minesweeper(qtw.QMainWindow):
         # self.pretty_print_board()
 
     def generate_board(self, row_given, column_given):
+        restricted_spots = self.find_restricted_spots(row_given, column_given)
         for bomb in range(self.BOMBS):
             # this is terrible implementation
             # FIXME better random bomb placer plz
             while True:
                 row, col = self.random_coords()
-                # can't place a bomb where they chose
-                if row == row_given and column_given == col:
+                # can't place a bomb where they chose, and in 3x3 area around it
+                if row == row_given and column_given == col or (row, col) in restricted_spots:
                     pass
                 # can't place a bomb on top of a bomb
                 elif self.board[row][col].get_value() != self.symbols["bomb"]:
@@ -378,7 +367,7 @@ class Minesweeper(qtw.QMainWindow):
                     self.board[row][column].set_value(self.bomb_counter_check(row, column))
             # string += "\n"
 
-    # assigns a number based on the 8 block range and the amount of bomb around it
+    # assigns a number based on the 3x3 block range (8 blocks excluding middle) and the amount of bomb around it
     def bomb_counter_check(self, row, col):
         result = 0
         # bottom left row+1, col - 1
@@ -428,9 +417,36 @@ class Minesweeper(qtw.QMainWindow):
 
     def flag_counter_update(self, didPlaceFlag):
         if didPlaceFlag:
-            self.flag_counter-=1
+            self.flag_counter -= 1
             self.flag_label.setText(f"Flag: {self.flag_counter}")
         else:
-                self.flag_counter+=1
-                self.flag_label.setText(f"Flag: {self.flag_counter}")
+            self.flag_counter += 1
+            self.flag_label.setText(f"Flag: {self.flag_counter}")
 
+    def find_restricted_spots(self, row_given, column_given):
+        restricted_spots = {(row_given, column_given): ""}
+        # bottom left row_given+1, column_given - 1
+        if not (row_given + 1 >= self.ROWS) and not (column_given - 1 < 0):
+            restricted_spots[(row_given + 1, column_given - 1)] = ""
+        # left column_given - 1
+        if not (column_given - 1 < 0):
+            restricted_spots[(row_given, column_given - 1)] = ""
+        # top left row_given-1, column_given-1
+        if not (row_given - 1 < 0) and not (column_given - 1 < 0):
+            restricted_spots[(row_given - 1, column_given - 1)] = ""
+        # top
+        if not (row_given - 1 < 0):
+            restricted_spots[(row_given - 1, column_given)] = ""
+        # top right row_given-1, column_given +1
+        if not (row_given - 1 < 0) and not (column_given + 1 >= self.COL):
+            restricted_spots[(row_given - 1, column_given + 1)] = ""
+        # right row_given, column_given +1
+        if not (column_given + 1 >= self.COL):
+            restricted_spots[(row_given, column_given + 1)] = ""
+        # bottom right row_given+1, column_given+1
+        if not (row_given + 1 >= self.ROWS) and not (column_given + 1 >= self.COL):
+            restricted_spots[(row_given + 1, column_given + 1)] = ""
+        # bottom row_given+1, column_given
+        if not (row_given + 1 >= self.ROWS):
+            restricted_spots[(row_given + 1, column_given)] = ""
+        return restricted_spots
