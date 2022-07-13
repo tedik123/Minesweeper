@@ -8,6 +8,8 @@ import os
 
 from Tile import Tile
 
+import json
+
 
 class Minesweeper(qtw.QMainWindow):
     path = os.getcwd()
@@ -23,6 +25,7 @@ class Minesweeper(qtw.QMainWindow):
     }
     DIFFICULTY = {
         #        row, column, bombs
+        # 'Test': (3, 3, 0),
         'Easy': (8, 10, 10),
         'Normal': (14, 18, 40),
         'Hard': (20, 24, 99)
@@ -60,6 +63,7 @@ class Minesweeper(qtw.QMainWindow):
         # self.button = qtw.QPushButton()
         self.main_layout.addWidget(self.game_widget, 5)
 
+        self.current_difficulty = "Easy"
         self.show()
 
     def create_header(self):
@@ -137,13 +141,16 @@ class Minesweeper(qtw.QMainWindow):
     def difficulty_list(self):
         diff_list = qtw.QComboBox()
         diff_list.setSizePolicy(qtw.QSizePolicy.Maximum, qtw.QSizePolicy.Maximum)
+        # you could use keys, and values to set this
         diff_list.addItem("Easy")
         diff_list.addItem("Normal")
         diff_list.addItem("Hard")
+        diff_list.addItem("Test")
         return diff_list
 
     def update_difficulty(self, text):
         self.ROWS, self.COL, self.BOMBS = self.DIFFICULTY[text]
+        self.current_difficulty = text
         self.reset_board()
 
     def create_tiles(self):
@@ -198,7 +205,11 @@ class Minesweeper(qtw.QMainWindow):
 
     def game_over_screen(self, isWon=False):
         self.msg = QMessageBox()
+        self.msg.setStyleSheet("font: Impact;"
+                               "font-size: 14px;")
         self.msg.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
+        # stop the timer
+        self.timer.stop()
 
         # TODO  icon if you lose and also need one if you won
         if not isWon:
@@ -209,10 +220,18 @@ class Minesweeper(qtw.QMainWindow):
             self.msg.setInformativeText("Do you want to continue?")
         else:
             # place winner icon here
+            scores = self.beat_score()
+            if scores:
+                self.msg.setTextFormat(qtc.Qt.RichText)
+                self.msg.setText(f"YOU WON!<br><br>"
+                                 f"You beat your high score of <b>{scores[0]}</b>!     <br>"
+                                 f"Your new score is <b>{scores[0]}</b>!     "
+                                 )
+            else:
+                self.msg.setText("You won!")
+            self.msg.setInformativeText("Do you want to continue?")
             self.msg.setIconPixmap(qtg.QPixmap("images/happy.png"))
             self.msg.setWindowTitle("You won!")
-            self.msg.setText("You won!")
-            self.msg.setInformativeText("Do you want to continue?")
         # self.msg.setIcon()
         self.msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         self.msg.buttonClicked.connect(self.continue_game_check)
@@ -282,6 +301,7 @@ class Minesweeper(qtw.QMainWindow):
                 elif self.board[row][col].get_value() != self.symbols["bomb"]:
                     self.board[row][col].set_value(self.symbols["bomb"])
                     break
+                print("SFSFSFSf")
 
         # we have the bombs now we need to generate the numbers that are around bombs
         # then we need to generate the numbers that show bomb stuff
@@ -423,6 +443,39 @@ class Minesweeper(qtw.QMainWindow):
             self.flag_counter += 1
             self.flag_label.setText(f"Flag: {self.flag_counter}")
 
+    def save_score(self):
+        # load old data and append
+        data = {}
+        old_data = None
+        # check if the score file exists
+        if os.path.exists('scores.json'):
+            with open('scores.json', "r") as f:
+                old_data = json.load(f)
+        print(data)
+        if old_data:
+            data = old_data
+        # save it as an int
+        data[self.current_difficulty] = int(self.timer_label.text())
+        with open('scores.json', 'w') as f:
+            json.dump(data, f)
+
+    # definitely could've done this with a lot less file operations
+    def beat_score(self):
+        if os.path.exists('scores.json'):
+            with open('scores.json', "r") as f:
+                data = json.load(f)
+                high_score = data.get(self.current_difficulty, 9999999999)
+                print(high_score)
+                if high_score > int(self.timer_label.text()):
+                    self.save_score()
+                # return old score, new score
+                return (high_score, int(self.timer_label.text()))
+        # they have no record save it anyway
+        else:
+            self.save_score()
+        return False
+
+    # TODO
     def find_restricted_spots(self, row_given, column_given):
         restricted_spots = {(row_given, column_given): ""}
         # bottom left row_given+1, column_given - 1
@@ -450,3 +503,22 @@ class Minesweeper(qtw.QMainWindow):
         if not (row_given + 1 >= self.ROWS):
             restricted_spots[(row_given + 1, column_given)] = ""
         return restricted_spots
+
+    def hint_giver(self):
+        probability_board = {}
+        for row in range(self.ROWS):
+            for column in range(self.COL):
+                current_tile = self.board[row][column]
+                # if it's visible add it to the probability board
+                if not current_tile.isVisible:
+                    probability_board[current_tile] = -1
+        # now we have all tiles that are invisible
+        # we need to look around in all 8 directions for 2 things
+        # A) at least one must be visible
+        # B) add a counter for every thing that marks it as questionable
+        for tile in probability_board:
+            row, col = tile.get_pos()
+            neighbors = self.find_restricted_spots(row, col)
+            for pos in neighbors.keys():
+                n_row, n_col = pos
+                neighbor_tile = self.board[n_row][n_col]

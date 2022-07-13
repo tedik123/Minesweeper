@@ -18,5 +18,7 @@ if __name__ == '__main__':
     app = qtw.QApplication(sys.argv)
     app.setWindowIcon(qtg.QIcon('images/bomb_64x64.png'))
     mw = Minesweeper()
+    # mw.resize()
+
     mw.resize(400, 400)
     sys.exit(app.exec())
