@@ -141,11 +141,13 @@ class Minesweeper(qtw.QMainWindow):
     def difficulty_list(self):
         diff_list = qtw.QComboBox()
         diff_list.setSizePolicy(qtw.QSizePolicy.Maximum, qtw.QSizePolicy.Maximum)
+        for key in dict.keys(self.DIFFICULTY):
+            diff_list.addItem(key)
         # you could use keys, and values to set this
-        diff_list.addItem("Easy")
-        diff_list.addItem("Normal")
-        diff_list.addItem("Hard")
-        diff_list.addItem("Test")
+        # diff_list.addItem("Easy")
+        # diff_list.addItem("Normal")
+        # diff_list.addItem("Hard")
+        # diff_list.addItem("Test")
         return diff_list
 
     def update_difficulty(self, text):
