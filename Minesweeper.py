@@ -11,9 +11,7 @@ from Tile import Tile
 import json
 
 
-class Minesweeper(qtw.QMainWindow):
-    path = os.getcwd()
-    os.chdir(path)
+class Minesweeper(qtw.QWidget):
     # set it to easy first!
     ROWS = 8
     COL = 10
@@ -37,8 +35,10 @@ class Minesweeper(qtw.QMainWindow):
     # number = number
     def __init__(self):
         super().__init__()
-        self.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
-        self.setWindowTitle("Minesweeper")
+
+        # self.isOnlinePlayer = isOnlinePlayer
+        # self.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
+        # self.setWindowTitle("Minesweeper")
         self.board = []
         self.is_first_move = True
         self.end_game = False
@@ -46,8 +46,10 @@ class Minesweeper(qtw.QMainWindow):
         # create the main layout
         self.main_widget = qtw.QWidget()
         self.main_layout = qtw.QVBoxLayout()
-        self.main_widget.setLayout(self.main_layout)
-        self.setCentralWidget(self.main_widget)
+        # self.main_widget.setLayout(self.main_layout)
+
+        self.setLayout(self.main_layout)
+        # self.setCentralWidget(self.main_widget)
 
         # set the font stuff after the title creation
         self.create_header()
@@ -64,7 +66,7 @@ class Minesweeper(qtw.QMainWindow):
         self.main_layout.addWidget(self.game_widget, 5)
 
         self.current_difficulty = "Easy"
-        self.show()
+        # self.show()
 
     def create_header(self):
         # header is the whole top
@@ -120,6 +122,8 @@ class Minesweeper(qtw.QMainWindow):
         # update the timer every 1 second
         # self.timer.start(1000)
         return self.timer_widget
+
+
 
     # method called by timer
     # https://www.geeksforgeeks.org/pyqt5-digital-stopwatch/

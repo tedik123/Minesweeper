@@ -43,6 +43,12 @@ class Client(QtCore.QObject):
     def close(self):
         self.client.close()
 
+    # we can just send a dict and the key will be the event name
+    def send_object(self,key,content):
+        content_bytes = pickle.dumps(content)
+        # need key here before sending
+        self.client.sendBinaryMessage([key, content_bytes])
+
 
 def quit_app():
     print("timer timeout - exiting")

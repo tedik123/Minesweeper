@@ -1,9 +1,9 @@
 import pickle
-
+from Events import Events
 from PyQt5 import QtCore, QtWebSockets, QtNetwork, QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction
 from PyQt5.QtCore import QUrl
-from TestObject import TestObject
+# from TestObject import TestObject
 
 class MyServer(QtCore.QObject):
 
@@ -60,7 +60,10 @@ class MyServer(QtCore.QObject):
         # this is how we can translate objects back to something not cringe
         # important -> YAY this is how we can convert whatever data we want back to an object!
         object_returned = pickle.loads(message)
-        print(object_returned.data)
+        # print(object_returned.data)
+        print(object_returned)
+        print("data", object_returned.data)
+
         # print("b:", pickle.loads(message))
         if self.clientConnection:
             self.clientConnection.sendBinaryMessage(message)
