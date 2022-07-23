@@ -33,9 +33,12 @@ class Minesweeper(qtw.QWidget):
     # _ = empty
     # * = bomb
     # number = number
-    def __init__(self):
+    def __init__(self, isOnlinePlayer=True):
         super().__init__()
-
+        # is onlineplayer is basically whether to make it a dummy minesweeper game that only updates from socket calls
+        self.isOnlinePlayer = isOnlinePlayer
+        # online is if it's a multiplayer game unrelated to isOnlinePlayer
+        self.isOnline = False
         # self.isOnlinePlayer = isOnlinePlayer
         # self.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
         # self.setWindowTitle("Minesweeper")
@@ -123,8 +126,6 @@ class Minesweeper(qtw.QWidget):
         # self.timer.start(1000)
         return self.timer_widget
 
-
-
     # method called by timer
     # https://www.geeksforgeeks.org/pyqt5-digital-stopwatch/
     def showTime(self):
@@ -168,7 +169,7 @@ class Minesweeper(qtw.QWidget):
         for r in range(self.ROWS):
             current = []
             for c in range(self.COL):
-                tile = Tile(r, c, self.symbols['tile'])
+                tile = Tile(r, c, self.symbols['tile'], True)
                 # tile.clicked.connect(lambda: self.pick_spot(tile.get_pos()))
                 self.grid_layout.addWidget(tile, r, c, 1, 1)
                 tile.coords.connect(self.pick_spot)
@@ -307,7 +308,7 @@ class Minesweeper(qtw.QWidget):
                 elif self.board[row][col].get_value() != self.symbols["bomb"]:
                     self.board[row][col].set_value(self.symbols["bomb"])
                     break
-                print("SFSFSFSf")
+                # print("SFSFSFSf")
 
         # we have the bombs now we need to generate the numbers that are around bombs
         # then we need to generate the numbers that show bomb stuff
@@ -528,3 +529,11 @@ class Minesweeper(qtw.QWidget):
             for pos in neighbors.keys():
                 n_row, n_col = pos
                 neighbor_tile = self.board[n_row][n_col]
+
+    def set_online(self, socket):
+        self.socket = socket
+        self.isOnline = True
+        self.board_generated_event = qtc.pyqtSignal(dict)
+        # this will be a dict with the value being an array of coord positions to reveal
+        # i think that's the best way to do it, it saves having to do BFS or any other searching
+        self.reveal_tiles_event = qtc.pyqtSignal(dict)

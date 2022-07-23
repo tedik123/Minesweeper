@@ -7,10 +7,14 @@ class Tile(qtw.QPushButton):
     coords = qtc.pyqtSignal(int, int)
     # flagged will be used to update the flag counter in main
     flagged = qtc.pyqtSignal(bool)
-    def __init__(self, row, column, value=None):
+
+    def __init__(self, row, column,value, isOnlinePlayer=False):
         super().__init__()
         self.setStyleSheet("margin: -1;")
         self.setSizePolicy(qtw.QSizePolicy.Expanding, qtw.QSizePolicy.Expanding)
+        if not isOnlinePlayer:
+            self.setDisabled()
+
         self.clicked.connect(self.coord_signal_function)
         self.row = row
         self.column = column
