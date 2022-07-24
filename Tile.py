@@ -7,7 +7,8 @@ class Tile(qtw.QPushButton):
     coords = qtc.pyqtSignal(int, int)
     # flagged will be used to update the flag counter in main
     flagged = qtc.pyqtSignal(bool)
-
+    _MINSIZE = (32, 32)
+    _MINICONSIZE = (25, 25)
     def __init__(self, row, column,value, isOnlinePlayer=False):
         super().__init__()
         self.setStyleSheet("margin: -1;")
@@ -21,7 +22,7 @@ class Tile(qtw.QPushButton):
         self.value = value
         self.isBomb = False
         self.isVisible = False
-        self.setMinimumSize(32, 32)
+        self.setMinimumSize(self._MINSIZE[0], self._MINSIZE[1])
         if value == "*":
             self.isBomb = True
 
@@ -70,7 +71,7 @@ class Tile(qtw.QPushButton):
             icon.addPixmap(pic, qtg.QIcon.Disabled)
             self.setIcon(icon)
             # if you want to adjust icon size
-            self.setIconSize(qtc.QSize(25, 25))
+            self.setIconSize(qtc.QSize(self._MINICONSIZE[0], self._MINICONSIZE[1]))
 
         else:
             # if it's not an empty block set the number image
@@ -80,7 +81,7 @@ class Tile(qtw.QPushButton):
                 pic = qtg.QPixmap(location)
                 icon.addPixmap(pic, qtg.QIcon.Normal)
                 icon.addPixmap(pic, qtg.QIcon.Disabled)
-                self.setIconSize(qtc.QSize(25, 25))
+                self.setIconSize(qtc.QSize(self._MINICONSIZE[0], self._MINICONSIZE[1]))
                 self.setIcon(icon)
                 # self.setText(self.show_value())
             else:
@@ -97,7 +98,7 @@ class Tile(qtw.QPushButton):
     def flag_button(self):
         if self.icon().isNull():
             self.setIcon(qtg.QIcon("images/flag2.png"))
-            self.setIconSize(qtc.QSize(25, 25))
+            self.setIconSize(qtc.QSize(self._MINICONSIZE[0], self._MINICONSIZE[1]))
             self.flagged.emit(True)
         else:
             self.setIcon(qtg.QIcon())

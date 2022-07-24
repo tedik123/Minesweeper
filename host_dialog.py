@@ -1,4 +1,5 @@
 from PyQt5 import QtWidgets as qtw, QtWebSockets
+from PyQt5.QtCore import pyqtSignal
 from requests import get
 
 from Client import Client
@@ -7,7 +8,7 @@ from Server import MyServer
 
 class HostDialog(qtw.QDialog):
     """Dialog for setting the settings"""
-
+    start_game_signal = pyqtSignal(str)
     # notice this is similar to making your own custom widget/window
     # but with QDialog you get a few things for "free"
     # such as the self.accept and self.reject functions
@@ -45,7 +46,7 @@ class HostDialog(qtw.QDialog):
         self.start_btn.clicked.connect(self.on_launch)
         self.layout().addRow(self.cancel_btn, self.start_btn)
         # host client thing
-        self.client = None
+        self.parent.client = None
 
     # FIXME should i really be manipulating the parent like this??
     def on_launch(self):
@@ -53,21 +54,25 @@ class HostDialog(qtw.QDialog):
         # I don't know what each one does
         # update our launch button to be our start game button instead
         self.start_btn.setText("Start Game")
-        # self.start_btn.clicked.disconnect(self.enable_launch_button)
+        # disconnect so it doesn't overlap methods
         self.start_btn.clicked.disconnect(self.on_launch)
-        self.start_btn.setDisabled(True)
+        self.start_btn.setDisabled(False)
+        self.start_btn.clicked.connect(self.start_btn_clicked)
+
         # server creation
         self.parent.server_socket = QtWebSockets.QWebSocketServer('My Server',
                                                                   QtWebSockets.QWebSocketServer.NonSecureMode)
         self.parent.server = MyServer(self.parent.server_socket)
+
         # disable any possiblity for change
         self.username_inp.setEnabled(False)
         self.difficulty_inp.setEnabled(False)
-        # save the username to the client or something
-        # as well as create the username
-        self.client = Client(self.username_inp.text())
-        # need to ping for the connection to form?
-        # self.client.do_ping()
+
+        # create client and connect the signal to client for game launch later
+        # which will occur via client requests not this dialogue
+        self.parent.client = Client(self.username_inp.text())
+        self.start_game_signal.connect(self.parent.client.request_start_game)
+
         # player list used for usernames
         # key is username, value is an array [label, textedit]
         self.player_widget_list = {}
@@ -76,9 +81,7 @@ class HostDialog(qtw.QDialog):
         # set up connections
         self.parent.server.player_connected.connect(self.player_widget)
         self.parent.server.player_disconnected.connect(self.player_disconnected)
-
-        # TODO create the host client connection here
-        # should have created a user id here? ig
+        # fill in the widget
         self.player_widget(None, self.username_inp.text())
 
     # TODO player 1 should be the host!
@@ -103,7 +106,7 @@ class HostDialog(qtw.QDialog):
     def on_cancel(self):
         if self.parent.server_socket:
             self.parent.server_socket.close()
-            self.client.close()
+            self.parent.client.close()
         # if self.parent.server:
         # do i need to delete this?
         # self.parent.server.close()
@@ -117,3 +120,10 @@ class HostDialog(qtw.QDialog):
         self.layout().removeWidget(player_name)
         player_label.deleteLater()
         player_name.deleteLater()
+
+    def start_btn_clicked(self):
+        # I need to emit everything
+        # I have the player data saved to the client
+        # so that leaves just difficulty?
+        self.start_game_signal.emit(self.difficulty_inp.currentText())
+        self.close()

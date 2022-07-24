@@ -9,7 +9,7 @@ import uuid
 # from TestObject import TestObject
 
 class MyServer(QtCore.QObject):
-    player_connected = QtCore.pyqtSignal([str])
+    player_connected = QtCore.pyqtSignal(uuid.UUID, str)
     player_disconnected = QtCore.pyqtSignal(uuid.UUID, str)
 
     def __init__(self, parent):
@@ -19,7 +19,21 @@ class MyServer(QtCore.QObject):
         self.client_data = {}
         print("server name: {}".format(parent.serverName()))
         self.server = QtWebSockets.QWebSocketServer(parent.serverName(), parent.secureMode(), parent)
-        if self.server.listen(QtNetwork.QHostAddress.LocalHost, 1302):
+        # "ws://174.16.75.62:25565"
+        # print(QtNetwork.QHostAddress.))
+        # if self.server.listen(QtNetwork.QHostAddress.LocalHost, 1302):
+        # # from here to the if statement is absolutely useless code!
+        # host_adr = QtNetwork.QHostAddress("174.16.75.62")
+        # print(host_adr.toIPv6Address())
+        # # public_adr = host_adr.toIPv6Address()
+        # # if self.server.listen(QtNetwork.QHostAddress.LocalHost, 1302):
+        # host = host_adr.setAddress("174.16.75.62")
+        # # addr = QtNetwork.QHostAddress.Any
+        # addr = '.'.join(str(x) for x in host_adr.toIPv6Address()[-4:])
+        # print(f'Public ip address: {addr}')
+
+        # any basically means that it'll look to Ipv6 and Ipv4 addresses as long as it's the right port!
+        if self.server.listen(QtNetwork.QHostAddress.Any, 7777):
             print('Listening: {}:{}:{}'.format(
                 self.server.serverName(), self.server.serverAddress().toString(),
                 str(self.server.serverPort())))
@@ -35,32 +49,35 @@ class MyServer(QtCore.QObject):
         print("Accept Error: {}".format(accept_error))
 
     def onNewConnection(self):
-        print("onNewConnection")
-        self.clientConnection = self.server.nextPendingConnection()
-        self.clientConnection.textMessageReceived.connect(self.processTextMessage)
+        print("New client connecting...")
+        clientConnection = self.server.nextPendingConnection()
+        clientConnection.textMessageReceived.connect(self.processTextMessage)
 
-        self.clientConnection.textFrameReceived.connect(self.processTextFrame)
+        clientConnection.textFrameReceived.connect(self.processTextFrame)
 
-        self.clientConnection.binaryMessageReceived.connect(self.processBinaryMessage)
-        self.clientConnection.disconnected.connect(self.socketDisconnected)
+        clientConnection.binaryMessageReceived.connect(self.processBinaryMessage)
+        clientConnection.disconnected.connect(self.socketDisconnected)
 
-        print("newClient")
-        self.clients.append(self.clientConnection)
-        # TODO take in a username?
+        print("New Client added to list.")
+        # FIXME I'm worried that if a player connects and doesn't send their username then it'll cause issues...?
+        # should I append or wait until it's on the initial connection information?
+        self.clients.append(clientConnection)
+
 
     def processTextFrame(self, frame, is_last_frame):
-        print("in processTextFrame")
-        print("\tFrame: {} ; is_last_frame: {}".format(frame, is_last_frame))
+        # print("in processTextFrame")
+        # print("\tFrame: {} ; is_last_frame: {}".format(frame, is_last_frame))
+        pass
 
     def processTextMessage(self, message):
-        print("processTextMessage - message: {}".format(message))
-        if self.clientConnection:
-            for client in self.clients:
-                # if client!= self.clientConnection:
-                client.sendTextMessage(message)
-                client.sendTextMessage("CHICKEN")
-
-            # self.clientConnection.sendTextMessage(message)
+        # print("processTextMessage - message: {}".format(message))
+        # if self.clientConnection:
+        #     for client in self.clients:
+        #         # if client!= self.clientConnection:
+        #         client.sendTextMessage(message)
+        #         client.sendTextMessage("CHICKEN")
+        pass
+        # self.clientConnection.sendTextMessage(message)
 
     # def processBinaryMessage(self, message):
     #     # this is how we can translate objects back to something not cringe
@@ -84,13 +101,22 @@ class MyServer(QtCore.QObject):
         # https://doc-snapshots.qt.io/qt5-5.15/echoserver.html
         # we want to use self.sender() to grab the client who sent it?
         client_socket = self.sender()
-        object_returned = pickle.loads(payload)
-        print(object_returned)
-        event_type = object_returned['event']
+        try:
+            content = pickle.loads(payload)
+            print(content)
+            event_type = content['event']
+        except KeyError:
+            return print("Payload not formatted correctly!")
+
         # FIXME this should be a switch statement but it doesn't exist in python 3.9
-        if event_type == Events.connection:
+        if event_type == Events.Connection:
             print("connection update thingy")
-            self.initialConnectionInformation(client_socket, object_returned)
+            self.initialConnectionInformation(client_socket, content)
+
+        elif event_type == Events.GameStart:
+            print("GAME START SIGNAL")
+            self.start_game(content['difficulty'])
+
         else:
             print("idk haven't gotten here yet")
 
@@ -118,19 +144,63 @@ class MyServer(QtCore.QObject):
             print("Connection wasn't fully formed only deleting from listed connections.")
         self.clients.remove(client_socket)
         client_socket.deleteLater()
+        for client in self.clients:
+            content_to_send = self.form_object_to_send(Events.Disconnect, {'user_id': user_id})
+            client.sendBinaryMessage(content_to_send)
 
     # this will emit a username signal back to main to update the user information and stuff
     def initialConnectionInformation(self, client_socket, payload):
-        id = payload["user_id"]
+        user_id = payload["user_id"]
         username = payload["username"]
         # we'll store all relevant data by their unique id
-        self.client_data[id] = {
+        self.client_data[user_id] = {
             'socket': client_socket,
             'username': username,
         }
         print("client list!", self.clients)
         print('client data!', self.client_data)
-        self.player_connected.emit(username)
+        print(f"Initial data received from {username} \n"
+              f"id: {user_id}")
+        # this is for the GUI update of player list
+        self.player_connected.emit(user_id, username)
+        # this is for the actual sockets
+        # need to remove socket from data
+        formatted_player_data = self.format_player_data()
+
+        for client in self.clients:
+            content_to_send = self.form_object_to_send(Events.Connection, formatted_player_data)
+            client.sendBinaryMessage(content_to_send)
+
+
+    def start_game(self, difficulty):
+        for client in self.clients:
+            content = self.form_object_to_send(Events.GameStart, {'difficulty': difficulty})
+            client.sendBinaryMessage(content)
+
+
+
+
+    # we need this to remove the socket since that cannot be pickled
+    def format_player_data(self):
+        content_to_send = {}
+        player_count = 0
+        for user_id, data in self.client_data.items():
+            # current_data = {"player" + str(player_count): {"user_id": user_id, user_id: {'username': data['username']}}}
+            current_data = {user_id: {'username': data['username']}}
+
+            # current_data = current_data | {user_id: {'username': data['username']}}
+            content_to_send = content_to_send | current_data
+            player_count += 1
+        return content_to_send
+
+    def form_object_to_send(self, key, content):
+        header = {"event": key}
+        # this basically zips the dictionaries together by piping one into the other
+        content_to_send = header | content
+        print(content_to_send)
+        # serialize it
+        content_bytes = pickle.dumps(content_to_send)
+        return content_bytes
 
 
 if __name__ == '__main__':

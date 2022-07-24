@@ -2,8 +2,9 @@ import enum
 
 
 class Events(enum.Enum):
-    connection = "connection"
-    gameStart = "gameStart"
-    gameEnd = "gameEnd"
-    tileClicked = "tileClicked"
+    Connection = "connection"
+    Disconnect = "disconnect"
+    GameStart = "gameStart"
+    GameEnd = "gameEnd"
+    TileClicked = "tileClicked"
 
