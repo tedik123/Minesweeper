@@ -29,11 +29,22 @@ class Minesweeper(qtw.QWidget):
         'Hard': (20, 24, 99)
     }
 
+    # SIGNAL CREATION
+    # a note on this, if this causes issues when running multiple instances
+    # you can subclass it to create a Qobject that contains all the signals you want, not elegant but it's a workaround
+    board_generated_event = qtc.pyqtSignal(list)
+    # this will be a list of tuples that will be the coordinates of the tiles revealed,
+    # this of course means client side trust
+    # i think that's the best way to do it, it saves having to do BFS or any other searching
+    tiles_revealed_event = qtc.pyqtSignal(list)
+
+    #######
+
     # let's say:
     # _ = empty
     # * = bomb
     # number = number
-    def __init__(self, isOnlinePlayer=True):
+    def __init__(self, isOnlinePlayer=False):
         super().__init__()
         # is onlineplayer is basically whether to make it a dummy minesweeper game that only updates from socket calls
         self.isOnlinePlayer = isOnlinePlayer
@@ -325,56 +336,65 @@ class Minesweeper(qtw.QWidget):
     def search_explosion(self, row, col):
         first_tile = self.board[row][col]
         first_tile.set_isVisible(True)
+        # TODO need to handle if bomb in multiplayer
         if first_tile.isBomb:
+            self.tiles_revealed_event.emit([first_tile.get_pos()])
             self.check_game_over(first_tile.isBomb)
         else:
             self.check_game_over()
         # no expansion if it's just a number, just the one
         # print(first_tile.get_value())
         if first_tile.get_value() != 0:
+            self.tiles_revealed_event.emit([first_tile.get_pos()])
             return
         queue = []
         visited = []
+        # will store the coords of the ones revealed, only used for online
+        # not sure how to do this gracefully...
+        revealed = []
         # add it to the queue and the visited
         queue.append(first_tile)
         visited.append(first_tile)
+        revealed.append(first_tile.get_pos())
         while queue:
             current_tile = queue.pop(0)
             # duck me look in every direction
             row, col = current_tile.get_pos()
             # bottom left row+1, col - 1
             if not (row + 1 >= self.ROWS) and not (col - 1 < 0):
-                self.search_explosion_helper(self.board[row + 1][col - 1], queue, visited)
+                self.search_explosion_helper(self.board[row + 1][col - 1], queue, visited, revealed)
             # left col - 1
             if not (col - 1 < 0):
-                self.search_explosion_helper(self.board[row][col - 1], queue, visited)
+                self.search_explosion_helper(self.board[row][col - 1], queue, visited, revealed)
 
             # top left row-1, col-1
             if not (row - 1 < 0) and not (col - 1 < 0):
-                self.search_explosion_helper(self.board[row - 1][col - 1], queue, visited)
+                self.search_explosion_helper(self.board[row - 1][col - 1], queue, visited, revealed)
 
             # top
             if not (row - 1 < 0):
-                self.search_explosion_helper(self.board[row - 1][col], queue, visited)
+                self.search_explosion_helper(self.board[row - 1][col], queue, visited, revealed)
 
             # top right row-1, col +1
             if not (row - 1 < 0) and not (col + 1 >= self.COL):
-                self.search_explosion_helper(self.board[row - 1][col + 1], queue, visited)
+                self.search_explosion_helper(self.board[row - 1][col + 1], queue, visited, revealed)
 
             # right row, col +1
             if not (col + 1 >= self.COL):
-                self.search_explosion_helper(self.board[row][col + 1], queue, visited)
+                self.search_explosion_helper(self.board[row][col + 1], queue, visited, revealed)
 
             # bottom right row+1, col+1
             if not (row + 1 >= self.ROWS) and not (col + 1 >= self.COL):
-                self.search_explosion_helper(self.board[row + 1][col + 1], queue, visited)
+                self.search_explosion_helper(self.board[row + 1][col + 1], queue, visited, revealed)
 
             # bottom row+1, col
             if not (row + 1 >= self.ROWS):
-                self.search_explosion_helper(self.board[row + 1][col], queue, visited)
+                self.search_explosion_helper(self.board[row + 1][col], queue, visited, revealed)
+        # need to emit the revealed tiles to the client
+        self.tiles_revealed_event.emit(revealed)
         self.check_game_over()
 
-    def search_explosion_helper(self, tile, queue, visited):
+    def search_explosion_helper(self, tile, queue, visited, revealed):
         if tile not in visited:
             visited.append(tile)
             # if it's an int it's blocking and shouldn't go further
@@ -382,6 +402,7 @@ class Minesweeper(qtw.QWidget):
                 return
             # only show if not a bomb
             tile.set_isVisible(True)
+            revealed.append(tile.get_pos())
             if tile.get_value() > 0:
                 return
             queue.append(tile)
@@ -393,6 +414,8 @@ class Minesweeper(qtw.QWidget):
                 if not self.board[row][column].isBomb:
                     self.board[row][column].set_value(self.bomb_counter_check(row, column))
             # string += "\n"
+        if self.isOnline:
+            self.emit_board()
 
     # assigns a number based on the 3x3 block range (8 blocks excluding middle) and the amount of bomb around it
     def bomb_counter_check(self, row, col):
@@ -530,10 +553,34 @@ class Minesweeper(qtw.QWidget):
                 n_row, n_col = pos
                 neighbor_tile = self.board[n_row][n_col]
 
-    def set_online(self, socket):
-        self.socket = socket
-        self.isOnline = True
-        self.board_generated_event = qtc.pyqtSignal(dict)
-        # this will be a dict with the value being an array of coord positions to reveal
-        # i think that's the best way to do it, it saves having to do BFS or any other searching
-        self.reveal_tiles_event = qtc.pyqtSignal(dict)
+    def set_online(self, isOnline):
+        if isOnline:
+            self.isOnline = True
+        else:
+            # maybe unhook signals here?
+            print("Not finished")
+
+    # this is only for online use, receives a board and sets the board to what's provided
+    def set_board(self, board):
+        for row in range(self.ROWS):
+            for column in range(self.COL):
+                self.board[row][column].set_value(board[row][column])
+        # need to update this because we don't want the board to regenerate!
+        self.is_first_move = False
+        pass
+
+    def emit_board(self):
+        # we can't pickle the tiles directly so we need to extract the values of the generated board
+        # and then send it to the server/clients
+        dummy_board = []
+        for row in range(self.ROWS):
+            current = []
+            for column in range(self.COL):
+                current.append(self.board[row][column].get_value())
+            dummy_board.append(current)
+        self.board_generated_event.emit(dummy_board)
+
+    # must be an array reveals the tiles given the coordinates
+    def show_tiles(self, tile_coords):
+        for coords in tile_coords:
+            self.board[coords[0]][coords[1]].set_isVisible(True)

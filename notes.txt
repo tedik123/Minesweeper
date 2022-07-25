@@ -1,0 +1,10 @@
+more or less finished connecting as a client and hosting a server
+Now we need to do the logic for the basic set up
+1. need to display the different boards
+2. share the boards on generation (I think this is complete)
+3. Live update tile reveals
+4. Live update flags
+5. Game won signal/game lost
+6. Game won/lost dialogue including allowing for replay and difficulty updates
+7. UI changes; such as adding people's usernames; disabling difficulty for everyone but the host?
+7. Complete????????

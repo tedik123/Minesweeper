@@ -2,19 +2,21 @@ from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtGui as qtg
 from PyQt5 import QtCore as qtc
 
+import dill
 
 class Tile(qtw.QPushButton):
     coords = qtc.pyqtSignal(int, int)
     # flagged will be used to update the flag counter in main
     flagged = qtc.pyqtSignal(bool)
-    _MINSIZE = (32, 32)
-    _MINICONSIZE = (25, 25)
-    def __init__(self, row, column,value, isOnlinePlayer=False):
+
+    def __init__(self, row, column,value, isOnlinePlayer):
         super().__init__()
+        self.MINSIZE = (32, 32)
+        self.MINICONSIZE = (25, 25)
         self.setStyleSheet("margin: -1;")
         self.setSizePolicy(qtw.QSizePolicy.Expanding, qtw.QSizePolicy.Expanding)
-        if not isOnlinePlayer:
-            self.setDisabled()
+        # if not isOnlinePlayer:
+        #     self.setDisabled()
 
         self.clicked.connect(self.coord_signal_function)
         self.row = row
@@ -22,7 +24,7 @@ class Tile(qtw.QPushButton):
         self.value = value
         self.isBomb = False
         self.isVisible = False
-        self.setMinimumSize(self._MINSIZE[0], self._MINSIZE[1])
+        self.setMinimumSize(self.MINSIZE[0], self.MINSIZE[1])
         if value == "*":
             self.isBomb = True
 
@@ -71,7 +73,7 @@ class Tile(qtw.QPushButton):
             icon.addPixmap(pic, qtg.QIcon.Disabled)
             self.setIcon(icon)
             # if you want to adjust icon size
-            self.setIconSize(qtc.QSize(self._MINICONSIZE[0], self._MINICONSIZE[1]))
+            self.setIconSize(qtc.QSize(self.MINICONSIZE[0], self.MINICONSIZE[1]))
 
         else:
             # if it's not an empty block set the number image
@@ -81,7 +83,7 @@ class Tile(qtw.QPushButton):
                 pic = qtg.QPixmap(location)
                 icon.addPixmap(pic, qtg.QIcon.Normal)
                 icon.addPixmap(pic, qtg.QIcon.Disabled)
-                self.setIconSize(qtc.QSize(self._MINICONSIZE[0], self._MINICONSIZE[1]))
+                self.setIconSize(qtc.QSize(self.MINICONSIZE[0], self.MINICONSIZE[1]))
                 self.setIcon(icon)
                 # self.setText(self.show_value())
             else:
@@ -98,8 +100,10 @@ class Tile(qtw.QPushButton):
     def flag_button(self):
         if self.icon().isNull():
             self.setIcon(qtg.QIcon("images/flag2.png"))
-            self.setIconSize(qtc.QSize(self._MINICONSIZE[0], self._MINICONSIZE[1]))
+            self.setIconSize(qtc.QSize(self.MINICONSIZE[0], self.MINICONSIZE[1]))
             self.flagged.emit(True)
         else:
             self.setIcon(qtg.QIcon())
             self.flagged.emit(False)
+
+

@@ -70,7 +70,7 @@ class HostDialog(qtw.QDialog):
 
         # create client and connect the signal to client for game launch later
         # which will occur via client requests not this dialogue
-        self.parent.client = Client(self.username_inp.text())
+        self.parent.client = Client(self.username_inp.text(), self.parent)
         self.start_game_signal.connect(self.parent.client.request_start_game)
 
         # player list used for usernames
@@ -82,7 +82,7 @@ class HostDialog(qtw.QDialog):
         self.parent.server.player_connected.connect(self.player_widget)
         self.parent.server.player_disconnected.connect(self.player_disconnected)
         # fill in the widget
-        self.player_widget(None, self.username_inp.text())
+        # self.player_widget(None, self.username_inp.text())
 
     # TODO player 1 should be the host!
     # this gets called on the connection and takes in the text

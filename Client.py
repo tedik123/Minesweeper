@@ -16,10 +16,20 @@ class Client(QtCore.QObject):
     # IMPORTANT so for someone to connect they must use the public ip + port
     #  for the host that means they need to have that port forwarded unfortunately!
     #  also if it's the host they need to connect via ipv4 not ipv6!
-    def __init__(self,  username, parent=None):
+
+    # will just send the difficulty, we can access the player list from the client object
+    start_game_signal = QtCore.pyqtSignal(str)
+    board_received_signal = QtCore.pyqtSignal(dict)
+    successful_connection = QtCore.pyqtSignal(bool)
+    tiles_received_signal = QtCore.pyqtSignal(dict)
+
+    # generally if the method is pre-faced by an "on_" it means it's receiving from the server
+    # otherwise it's generated locally
+    def __init__(self, username, parent=None):
         super().__init__()
         if parent is not None:
-            parent.start_game_signal.connect(self.start_game)
+            self.parent = parent
+            self.start_game_signal.connect(self.parent.start_game)
 
         self.client = QtWebSockets.QWebSocket("", QtWebSockets.QWebSocketProtocol.Version13, None)
         # event connections
@@ -35,6 +45,7 @@ class Client(QtCore.QObject):
         self.client.pong.connect(self.onPong)
         self.client.textMessageReceived.connect(lambda x: print(x))
         self.client.binaryMessageReceived.connect(self.on_binary_message)
+        self.client.connected.connect(self.do_ping)
         self.user_id = uuid.uuid1()
         if username is None:
             self.username = self.user_id
@@ -43,7 +54,6 @@ class Client(QtCore.QObject):
         # contains other player data NOT including this client
         self.player_data = {}
 
-
     def do_ping(self):
         print("client: do_ping")
         self.client.ping(b"foo")
@@ -51,6 +61,7 @@ class Client(QtCore.QObject):
     def send_message(self):
         print("client: send_message")
         self.client.sendTextMessage("asd")
+
         # someobject = {"chicken": "dinner"}
         # someobject = TestObject()
         # print(someobject)
@@ -64,7 +75,6 @@ class Client(QtCore.QObject):
         self.send_object(Events.Connection, {'username': self.username,
                                              'user_id': self.user_id})
 
-
     def on_binary_message(self, payload):
         try:
             content = pickle.loads(payload)
@@ -75,24 +85,26 @@ class Client(QtCore.QObject):
 
         #   rest of code
         if event_type == Events.Connection:
-            self.connection_information(content)
+            self.on_connection_information(content)
         elif event_type == Events.Disconnect:
             self.on_disconnect(content)
         elif event_type == Events.GameStart:
             self.on_game_start(content)
+        elif event_type == Events.BoardGenerated:
+            self.on_board_received(content)
+        elif event_type == Events.TilesRevealed:
+            self.on_tiles_revealed(content)
         else:
             print("Not created yet.")
 
-
-    def connection_information(self, content):
+    def on_connection_information(self, content):
         for key, data in content.items():
             # kinda slow but eh
             if key != 'event' and key != self.user_id and key not in self.player_data:
                 self.player_data[key] = data
 
         print("Player connections:\n", self.player_data)
-
-
+        self.successful_connection.emit(True)
 
     # TODO handle GUI changes as well here with signals...but that's last
     # this just receives an event type and a dict formatted as "user_id": user_id
@@ -100,29 +112,48 @@ class Client(QtCore.QObject):
         for key, user_id in content.items():
             # probs do something else too
             if key != 'event':
-                del(self.player_data[user_id])
+                del (self.player_data[user_id])
                 print("Deleted")
                 print(self.player_data)
-
 
     # so here the client needs to emit to main how many games to create?
     # and then we need to tie the userIds to the game as well as display their usernames as headers?
     def on_game_start(self, content):
         print("Game start content", content)
+        print("Difficulty", content['difficulty'])
+        self.start_game_signal.emit(content['difficulty'])
 
     def request_start_game(self, difficulty):
         self.send_object(Events.GameStart, {'difficulty': difficulty})
 
+    def board_generated(self, board):
+        self.send_object(Events.BoardGenerated, {"user_id": self.user_id, "board": board})
 
+    def on_board_received(self, content):
+        # print("Board", content)
+        # remove event header we don't need it
+        del (content['event'])
+        print("Board received formatted:", content)
+        self.board_received_signal.emit(content)
 
+    def tiles_revealed(self, tiles):
+        self.send_object(Events.TilesRevealed, {"user_id": self.user_id, "tiles": tiles})
+
+    # TODO need to emit to local
+    def on_tiles_revealed(self, content):
+        del (content['event'])
+        print("Received from server tiles!", content)
+        self.tiles_received_signal.emit(content)
 
     def error(self, error_code):
         print("error code: {}".format(error_code))
         print(self.client.errorString())
+        self.successful_connection.emit(False)
+        # ? I don't know if this is okay, what if there's a small error mid game?
+        self.close()
 
     def close(self):
         self.client.close()
-
 
     # we can just send a dict and the key will be the event name
     # the dict will be formatted very similarly to a json

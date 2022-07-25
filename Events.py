@@ -6,5 +6,6 @@ class Events(enum.Enum):
     Disconnect = "disconnect"
     GameStart = "gameStart"
     GameEnd = "gameEnd"
-    TileClicked = "tileClicked"
+    TilesRevealed = "TilesRevealed"
+    BoardGenerated= "BoardGenerated"
 

@@ -117,6 +117,14 @@ class MyServer(QtCore.QObject):
             print("GAME START SIGNAL")
             self.start_game(content['difficulty'])
 
+        elif event_type == Events.BoardGenerated:
+            print("Board generation server")
+            self.received_board(content)
+
+        elif event_type == Events.TilesRevealed:
+            print("Server: Tile received")
+            self.received_tiles(content)
+
         else:
             print("idk haven't gotten here yet")
 
@@ -178,6 +186,19 @@ class MyServer(QtCore.QObject):
             client.sendBinaryMessage(content)
 
 
+    # don't need to format it's already formatted from the client so we just need to repickle
+    # it would be more efficient to never unpickle it and just pass it on...
+    def received_board(self, content):
+        current_socket = self.sender()
+        for client in self.clients:
+            if client is not current_socket:
+                client.sendBinaryMessage(pickle.dumps(content))
+
+    def received_tiles(self, content):
+        current_socket = self.sender()
+        for client in self.clients:
+            if client is not current_socket:
+                client.sendBinaryMessage(pickle.dumps(content))
 
 
     # we need this to remove the socket since that cannot be pickled
