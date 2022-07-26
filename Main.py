@@ -1,7 +1,6 @@
 import os
 import sys
 
-import dill
 
 from GameOver_dialog import GameOver_dialog
 from Minesweeper import Minesweeper
@@ -57,7 +56,8 @@ class Main(qtw.QMainWindow):
         # self.main_layout.addWidget(Minesweeper(True), 2, 2, 1, 1)
         # self.main_layout.addWidget(Minesweeper(True), 2, 1, 1, 1)
         self.counter = 0
-        self.is_first_online= True
+        self.is_first_online = True
+        self.games = {}
         self.show()
 
     def create_toolbar(self):
@@ -82,9 +82,14 @@ class Main(qtw.QMainWindow):
     def start_game(self, difficulty):
         # idk if this is necessary
         self.main_layout.setSpacing(0)
+        if self.game_over_dialog:
+            print("Closing game dialog")
+            self.game_over_dialog.close()
+            self.game_over_dialog = None
         # FIXME for now I assume only 4 players
         self.ms.set_online(True)
         self.ms.update_difficulty(difficulty)
+        self.ms.resize_to_difficulty()
         # in case it was hidden by the game over screen
         # IMPORTANT I NEED TO HOOK THESE SIGNALS ONCE!!!!
         self.ms.remove_online_game_over_screen()
@@ -96,7 +101,12 @@ class Main(qtw.QMainWindow):
             self.ms.game_over_event.connect(self.client.game_over)
 
         # we'll use this to access games, key will be UserID and value will be the game widget itself
-        self.games: dict[Minesweeper] = {}
+        #    remove each one
+        # to prevent overlap
+        if self.games:
+            for user_id, widget in self.games.items():
+                widget.deleteLater()
+                widget.setParent(None)
         idx = 0
         for user_id, data in self.client.player_data.items():
             print("user_id", user_id)
@@ -104,6 +114,7 @@ class Main(qtw.QMainWindow):
             current_game = Minesweeper(True)
             current_game.set_username(data['username'])
             current_game.update_difficulty(difficulty)
+            current_game.resize_to_difficulty()
 
             if idx < 3:
                 row, column, rowSpan, columnSpan = self.POSITIONS[idx]
@@ -114,15 +125,18 @@ class Main(qtw.QMainWindow):
             self.games[user_id] = current_game
             idx += 1
 
+        self.client.all_games_finished_signal.connect(self.all_games_finished)
         if self.is_first_online:
             self.client.board_received_signal.connect(self.set_board)
             self.client.tiles_received_signal.connect(self.show_tiles)
             self.client.tile_flagged_signal.connect(self.tile_flagged)
             self.client.game_over_signal.connect(self.game_over)
-            self.client.all_games_finished_signal.connect(self.all_games_finished)
-        self.is_first_online= False
+            # for some reason if I don't disconnect it in all_games_finished method
+            # it breaks and keeps spamming the dialog
+            # self.client.all_games_finished_signal.connect(self.all_games_finished)
 
-        # TODO add the other players for now I just want to do one and send the signals back to server and other clients
+        self.is_first_online = False
+
 
     # hypothetically
     def set_board(self, content):
@@ -135,9 +149,9 @@ class Main(qtw.QMainWindow):
         tiles = content["tiles"]
         current_game = self.games[user_id]
         # have to start timer manually
-        if not current_game.timer.isActive():
-            # tick every second
-            current_game.timer.start(1000)
+        # if not current_game.timer.isActive():
+        #     # tick every second
+        #     current_game.timer.start(1000)
         current_game.show_tiles(tiles)
 
     def tile_flagged(self, content):
@@ -153,23 +167,26 @@ class Main(qtw.QMainWindow):
         didWin = content["didWin"]
         time = content["time"]
         current_game = self.games[user_id]
+        # current_game.timer.stop()
+        # print("TIME STOPPED")
         current_game.online_player_game_over_screen(didWin, time)
-        current_game.timer.stop()
-
 
     def all_games_finished(self, content):
+        self.client.all_games_finished_signal.disconnect(self.all_games_finished)
         # check if host or not
-        self.counter+=1
+        self.counter += 1
         print(self.counter)
         if self.server:
             print("SERVER")
-            game_over = GameOver_dialog(self, content['winners'], content['losers'], self.client.player_data,
+            self.game_over_dialog = GameOver_dialog(self, content['winners'], content['losers'], self.client.player_data,
                                         self.client.user_id, True)
         else:
             print("CLIENT")
-            game_over = GameOver_dialog(self, content['winners'], content['losers'], self.client.player_data,
+            self.game_over_dialog = GameOver_dialog(self, content['winners'], content['losers'], self.client.player_data,
                                         self.client.user_id, False)
-        game_over.exec()
+        self.game_over_dialog.exec()
+
+
 
 
 #    on game over you can just disable the parent widget! https://stackoverflow.com/questions/34888407/how-to-disable-widgets-that-belong-to-layout-in-qt

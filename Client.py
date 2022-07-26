@@ -37,8 +37,8 @@ class Client(QtCore.QObject):
         self.client = QtWebSockets.QWebSocket("", QtWebSockets.QWebSocketProtocol.Version13, None)
         # event connections
         self.client.error.connect(self.error)
-        # self.client.open(QUrl("ws://127.0.0.1:1302"))
-        self.client.open(QUrl("ws://127.0.0.1:7777"))
+        # self.client.open(QUrl("ws://127.0.0.1:7777"))
+        self.client.open(QUrl(address))
 
         # self.client.open(QUrl("ws://127.0.0.1:25565"))
         # THIS is the format for public IPs!

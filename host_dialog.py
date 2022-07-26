@@ -27,6 +27,9 @@ class HostDialog(qtw.QDialog):
         ip_text.setText(ip)
         ip_text.setReadOnly(True)
         self.layout().addRow(qtw.QLabel("IP Addr."), ip_text)
+        self.port_num_text = qtw.QLineEdit()
+        self.port_num_text.setText("7777")
+        self.layout().addRow(qtw.QLabel("Port"), self.port_num_text)
         # now get username
         self.username_inp = qtw.QLineEdit()
         self.layout().addRow(qtw.QLabel("Username"), self.username_inp)
@@ -58,7 +61,7 @@ class HostDialog(qtw.QDialog):
         # server creation
         self.parent.server_socket = QtWebSockets.QWebSocketServer('My Server',
                                                                   QtWebSockets.QWebSocketServer.NonSecureMode)
-        self.parent.server = MyServer(self.parent.server_socket)
+        self.parent.server = MyServer(self.parent.server_socket, self.port_num_text.text())
 
         # disable any possiblity for change
         self.username_inp.setEnabled(False)

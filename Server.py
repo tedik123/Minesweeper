@@ -13,7 +13,7 @@ class MyServer(QtCore.QObject):
     player_disconnected = QtCore.pyqtSignal(uuid.UUID, str)
     all_players_finished = QtCore.pyqtSignal()
 
-    def __init__(self, parent):
+    def __init__(self, parent, port):
         super().__init__(parent)
         # super(QtCore.QObject, self).__init__()
         self.clients = []
@@ -39,7 +39,7 @@ class MyServer(QtCore.QObject):
         # print(f'Public ip address: {addr}')
 
         # any basically means that it'll look to Ipv6 and Ipv4 addresses as long as it's the right port!
-        if self.server.listen(QtNetwork.QHostAddress.Any, 7777):
+        if self.server.listen(QtNetwork.QHostAddress.Any, int(port)):
             print('Listening: {}:{}:{}'.format(
                 self.server.serverName(), self.server.serverAddress().toString(),
                 str(self.server.serverPort())))

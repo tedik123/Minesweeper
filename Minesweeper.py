@@ -93,6 +93,7 @@ class Minesweeper(qtw.QWidget):
 
         if self.isOnlinePlayer:
             self.difficulty_list_widget.hide()
+            self.online_timer_started = False
         # self.show()
 
     def create_header(self):
@@ -245,7 +246,7 @@ class Minesweeper(qtw.QWidget):
         if self.isOnline:
             print("GAME OVER BUT ONLINE")
             self.online_player_game_over_screen(isWon)
-            pass
+
         else:
             self.msg = QMessageBox()
             self.msg.setStyleSheet("font: Impact;"
@@ -610,6 +611,9 @@ class Minesweeper(qtw.QWidget):
 
     # must be an array reveals the tiles given the coordinates
     def show_tiles(self, tile_coords):
+        if self.isOnlinePlayer and not self.online_timer_started:
+            self.timer.start(1000)
+            self.online_timer_started = True
         for coords in tile_coords:
             self.board[coords[0]][coords[1]].set_isVisible(True)
 
@@ -619,6 +623,9 @@ class Minesweeper(qtw.QWidget):
     # emits the signal of game over to server
     # and displays locally game over
     def online_player_game_over_screen(self, isWon, time= None):
+        print("HERE TIME TSTOP PLEASE")
+        self.timer.stop()
+
         self.game_widget.hide()
         self.game_over_pic = qtw.QLabel()
         self.game_over_container = qtw.QWidget()
@@ -633,7 +640,6 @@ class Minesweeper(qtw.QWidget):
         if isWon:
             title_string = "You Won!"
             self.game_over_pic.setPixmap(qtg.QPixmap("images/happy.png").scaled(133, 160))
-
 
         else:
             title_string = "You Lost!"
@@ -658,6 +664,7 @@ class Minesweeper(qtw.QWidget):
 
     def remove_online_game_over_screen(self):
         try:
+            self.online_timer_started = False
             self.game_over_container.hide()
             self.game_widget.show()
         except AttributeError:
@@ -666,3 +673,8 @@ class Minesweeper(qtw.QWidget):
     def set_username(self, name):
         self.username = name
         self.username_label.setText(name)
+
+    def resize_to_difficulty(self):
+        for row in range(self.ROWS):
+            for column in range(self.COL):
+                self.board[row][column].adjust_size_to_difficulty(self.current_difficulty)

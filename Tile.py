@@ -2,7 +2,7 @@ from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtGui as qtg
 from PyQt5 import QtCore as qtc
 
-import dill
+
 
 class Tile(qtw.QPushButton):
     coords = qtc.pyqtSignal(int, int)
@@ -21,6 +21,7 @@ class Tile(qtw.QPushButton):
         if isOnlinePlayer:
             # this basically makes it so the dummy versions are non-interactive but doesn't make it all greyed out!
             self.blockSignals(True)
+            self.isOnlinePlayer = isOnlinePlayer
         self.clicked.connect(self.coord_signal_function)
 
         self.row = row
@@ -96,7 +97,7 @@ class Tile(qtw.QPushButton):
         self.setDisabled(True)
 
     def mousePressEvent(self, event):
-        if event.button() == qtc.Qt.RightButton:
+        if event.button() == qtc.Qt.RightButton and not self.isOnlinePlayer:
             self.flag_button()
         else:
             super().mousePressEvent(event)
@@ -110,4 +111,15 @@ class Tile(qtw.QPushButton):
             self.setIcon(qtg.QIcon())
             self.flagged.emit(False, self.get_pos())
 
+    def adjust_size_to_difficulty(self, difficulty):
+        if difficulty == "Easy":
+            self.MINSIZE = (32, 32)
+            self.MINICONSIZE = (25, 25)
+        elif difficulty == "Normal":
+            self.MINSIZE = (21, 21)
+            self.MINICONSIZE = (17, 17)
+        else:
+            self.MINSIZE = (16, 16)
+            self.MINICONSIZE = (12, 12)
+        self.setMinimumSize(self.MINSIZE[0], self.MINSIZE[1])
 
