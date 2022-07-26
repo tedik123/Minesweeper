@@ -7,12 +7,8 @@ from Client import Client
 
 
 class ConnectDialog(qtw.QDialog):
-    """Dialog for setting the settings"""
     start_game_signal = pyqtSignal(str)
-    # notice this is similar to making your own custom widget/window
-    # but with QDialog you get a few things for "free"
-    # such as the self.accept and self.reject functions
-    # and also an exec() function which tells us whether the dialog box was accepted or rejected
+
     def __init__(self, parent):
         # modal is whether it blocks or not, in this case it does
         super().__init__(parent, modal=True)
@@ -67,7 +63,11 @@ class ConnectDialog(qtw.QDialog):
         # self.setLayout(qtw.QHBoxLayout())
         self.info_label = qtw.QLabel("Connecting to host...", )
         self.layout().addWidget(self.info_label)
-        self.parent.client = Client(self.username_inp.text(), self.parent)
+        address = f"ws://{self.ip_text.text()}:{self.port_num_text.text()}"
+        self.parent.client = Client(self.username_inp.text(), self.parent, address)
+        # for testing
+        # self.parent.client = Client(self.username_inp.text(), self.parent)
+
         self.parent.client.successful_connection.connect(self.change_status)
 
     def change_status(self, successful):

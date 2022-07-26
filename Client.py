@@ -19,17 +19,20 @@ class Client(QtCore.QObject):
 
     # will just send the difficulty, we can access the player list from the client object
     start_game_signal = QtCore.pyqtSignal(str)
+    game_over_signal = QtCore.pyqtSignal(dict)
+    all_games_finished_signal = QtCore.pyqtSignal(dict)
     board_received_signal = QtCore.pyqtSignal(dict)
     successful_connection = QtCore.pyqtSignal(bool)
     tiles_received_signal = QtCore.pyqtSignal(dict)
+    tile_flagged_signal = QtCore.pyqtSignal(dict)
 
     # generally if the method is pre-faced by an "on_" it means it's receiving from the server
     # otherwise it's generated locally
-    def __init__(self, username, parent=None):
+    def __init__(self, username, parent, address="ws://127.0.0.1:7777"):
         super().__init__()
-        if parent is not None:
-            self.parent = parent
-            self.start_game_signal.connect(self.parent.start_game)
+        # unfortunately I have to do this connection here
+        self.parent = parent
+        self.start_game_signal.connect(self.parent.start_game)
 
         self.client = QtWebSockets.QWebSocket("", QtWebSockets.QWebSocketProtocol.Version13, None)
         # event connections
@@ -47,6 +50,7 @@ class Client(QtCore.QObject):
         self.client.binaryMessageReceived.connect(self.on_binary_message)
         self.client.connected.connect(self.do_ping)
         self.user_id = uuid.uuid1()
+
         if username is None:
             self.username = self.user_id
         self.username = username
@@ -94,6 +98,12 @@ class Client(QtCore.QObject):
             self.on_board_received(content)
         elif event_type == Events.TilesRevealed:
             self.on_tiles_revealed(content)
+        elif event_type == Events.TileFlagged:
+            self.on_tile_flagged(content)
+        elif event_type == Events.GameOver:
+            self.on_game_over(content)
+        elif event_type == Events.AllFinished:
+            self.on_all_finished(content)
         else:
             print("Not created yet.")
 
@@ -144,6 +154,27 @@ class Client(QtCore.QObject):
         del (content['event'])
         print("Received from server tiles!", content)
         self.tiles_received_signal.emit(content)
+
+    def tile_flagged(self, didPlaceFlag, coords):
+        self.send_object(Events.TileFlagged, {"user_id": self.user_id, "didPlaceFlag": didPlaceFlag, "coords": coords})
+
+    def on_tile_flagged(self, content):
+        del (content['event'])
+        print("Received from server a flag!", content)
+        self.tile_flagged_signal.emit(content)
+
+    def game_over(self, didWin, time):
+        self.send_object(Events.GameOver, {"user_id": self.user_id, "didWin": didWin, "time": time})
+
+    def on_game_over(self, content):
+        del (content['event'])
+        print("Someone finished their game", content)
+        self.game_over_signal.emit(content)
+
+    def on_all_finished(self, content):
+        del(content['event'])
+        print("ALL GAMES ARE OVER")
+        self.all_games_finished_signal.emit(content)
 
     def error(self, error_code):
         print("error code: {}".format(error_code))

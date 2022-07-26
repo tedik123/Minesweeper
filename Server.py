@@ -11,12 +11,18 @@ import uuid
 class MyServer(QtCore.QObject):
     player_connected = QtCore.pyqtSignal(uuid.UUID, str)
     player_disconnected = QtCore.pyqtSignal(uuid.UUID, str)
+    all_players_finished = QtCore.pyqtSignal()
 
     def __init__(self, parent):
         super().__init__(parent)
         # super(QtCore.QObject, self).__init__()
         self.clients = []
         self.client_data = {}
+        # used to see how many games have finished
+        self.game_counter = 0
+        self.winners = {}
+        self.losers = {}
+
         print("server name: {}".format(parent.serverName()))
         self.server = QtWebSockets.QWebSocketServer(parent.serverName(), parent.secureMode(), parent)
         # "ws://174.16.75.62:25565"
@@ -63,7 +69,6 @@ class MyServer(QtCore.QObject):
         # should I append or wait until it's on the initial connection information?
         self.clients.append(clientConnection)
 
-
     def processTextFrame(self, frame, is_last_frame):
         # print("in processTextFrame")
         # print("\tFrame: {} ; is_last_frame: {}".format(frame, is_last_frame))
@@ -103,7 +108,7 @@ class MyServer(QtCore.QObject):
         client_socket = self.sender()
         try:
             content = pickle.loads(payload)
-            print(content)
+            # print(content)
             event_type = content['event']
         except KeyError:
             return print("Payload not formatted correctly!")
@@ -124,6 +129,14 @@ class MyServer(QtCore.QObject):
         elif event_type == Events.TilesRevealed:
             print("Server: Tile received")
             self.received_tiles(content)
+
+        elif event_type == Events.TileFlagged:
+            print("Flagged Tile")
+            self.received_flag(content)
+
+        elif event_type == Events.GameOver:
+            print("Some game ended")
+            self.game_over(content)
 
         else:
             print("idk haven't gotten here yet")
@@ -179,15 +192,17 @@ class MyServer(QtCore.QObject):
             content_to_send = self.form_object_to_send(Events.Connection, formatted_player_data)
             client.sendBinaryMessage(content_to_send)
 
-
     def start_game(self, difficulty):
+        self.game_counter = 0
+        self.winners = {}
+        self.losers = {}
         for client in self.clients:
             content = self.form_object_to_send(Events.GameStart, {'difficulty': difficulty})
             client.sendBinaryMessage(content)
 
-
     # don't need to format it's already formatted from the client so we just need to repickle
     # it would be more efficient to never unpickle it and just pass it on...
+    # I also basically use the same function 3 times with a different name...I should change that...
     def received_board(self, content):
         current_socket = self.sender()
         for client in self.clients:
@@ -199,6 +214,53 @@ class MyServer(QtCore.QObject):
         for client in self.clients:
             if client is not current_socket:
                 client.sendBinaryMessage(pickle.dumps(content))
+
+    def received_flag(self, content):
+        current_socket = self.sender()
+        for client in self.clients:
+            if client is not current_socket:
+                client.sendBinaryMessage(pickle.dumps(content))
+
+    def game_over(self, content):
+        print("SERVER SEES GAME IS OVER")
+        print("Clients", self.clients)
+        current_socket = self.sender()
+        self.game_counter += 1
+        for client in self.clients:
+            if client is not current_socket:
+                client.sendBinaryMessage(pickle.dumps(content))
+
+        # add to rankings list
+        del (content['event'])
+        user_id = content['user_id']
+        del (content['user_id'])
+        # saving time only by user_id
+        if content['didWin']:
+            del (content['didWin'])
+            # leaving with just userId and timer
+            self.winners[user_id] = content['time']
+            # print("winners", self.winners)
+        else:
+            del (content['didWin'])
+            self.losers[user_id] = content['time']
+            # print("losers", self.losers)
+
+        if self.game_counter == len(self.clients):
+            print("ALL GAMES ARE FINISHED")
+            winners, losers = self.sort_game_overs()
+            to_send = self.form_object_to_send(Events.AllFinished, {"winners": winners, "losers": losers})
+            for client in self.clients:
+                print("ONE")
+                client.sendBinaryMessage(to_send)
+
+    # returns a list of tupples (user_id, timer) sorted
+    def sort_game_overs(self):
+        winners = sorted(self.winners.items(), key=lambda x: x[1])
+        # people who lose slower are better...
+        losers = sorted(self.losers.items(), key=lambda x: x[1], reverse=True)
+        print("SORTED WINNERS", winners)
+        print("SORTED LOSERS", losers)
+        return winners, losers
 
 
     # we need this to remove the socket since that cannot be pickled

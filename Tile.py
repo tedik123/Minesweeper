@@ -7,7 +7,8 @@ import dill
 class Tile(qtw.QPushButton):
     coords = qtc.pyqtSignal(int, int)
     # flagged will be used to update the flag counter in main
-    flagged = qtc.pyqtSignal(bool)
+    # passing the coordinates since we need that for online
+    flagged = qtc.pyqtSignal(bool, tuple)
 
     def __init__(self, row, column,value, isOnlinePlayer):
         super().__init__()
@@ -17,8 +18,11 @@ class Tile(qtw.QPushButton):
         self.setSizePolicy(qtw.QSizePolicy.Expanding, qtw.QSizePolicy.Expanding)
         # if not isOnlinePlayer:
         #     self.setDisabled()
-
+        if isOnlinePlayer:
+            # this basically makes it so the dummy versions are non-interactive but doesn't make it all greyed out!
+            self.blockSignals(True)
         self.clicked.connect(self.coord_signal_function)
+
         self.row = row
         self.column = column
         self.value = value
@@ -101,9 +105,9 @@ class Tile(qtw.QPushButton):
         if self.icon().isNull():
             self.setIcon(qtg.QIcon("images/flag2.png"))
             self.setIconSize(qtc.QSize(self.MINICONSIZE[0], self.MINICONSIZE[1]))
-            self.flagged.emit(True)
+            self.flagged.emit(True, self.get_pos())
         else:
             self.setIcon(qtg.QIcon())
-            self.flagged.emit(False)
+            self.flagged.emit(False, self.get_pos())
 
 
