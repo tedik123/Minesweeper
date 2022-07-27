@@ -3,21 +3,33 @@ from PyQt5 import QtGui as qtg
 from PyQt5 import QtCore as qtc
 
 
+
 class Tile(qtw.QPushButton):
     coords = qtc.pyqtSignal(int, int)
     # flagged will be used to update the flag counter in main
-    flagged = qtc.pyqtSignal(bool)
-    def __init__(self, row, column, value=None):
+    # passing the coordinates since we need that for online
+    flagged = qtc.pyqtSignal(bool, tuple)
+
+    def __init__(self, row, column,value, isOnlinePlayer):
         super().__init__()
+        self.MINSIZE = (32, 32)
+        self.MINICONSIZE = (25, 25)
         self.setStyleSheet("margin: -1;")
         self.setSizePolicy(qtw.QSizePolicy.Expanding, qtw.QSizePolicy.Expanding)
+        # if not isOnlinePlayer:
+        #     self.setDisabled()
+        if isOnlinePlayer:
+            # this basically makes it so the dummy versions are non-interactive but doesn't make it all greyed out!
+            self.blockSignals(True)
+            self.isOnlinePlayer = isOnlinePlayer
         self.clicked.connect(self.coord_signal_function)
+
         self.row = row
         self.column = column
         self.value = value
         self.isBomb = False
         self.isVisible = False
-        self.setMinimumSize(32, 32)
+        self.setMinimumSize(self.MINSIZE[0], self.MINSIZE[1])
         if value == "*":
             self.isBomb = True
 
@@ -66,7 +78,7 @@ class Tile(qtw.QPushButton):
             icon.addPixmap(pic, qtg.QIcon.Disabled)
             self.setIcon(icon)
             # if you want to adjust icon size
-            self.setIconSize(qtc.QSize(25, 25))
+            self.setIconSize(qtc.QSize(self.MINICONSIZE[0], self.MINICONSIZE[1]))
 
         else:
             # if it's not an empty block set the number image
@@ -76,7 +88,7 @@ class Tile(qtw.QPushButton):
                 pic = qtg.QPixmap(location)
                 icon.addPixmap(pic, qtg.QIcon.Normal)
                 icon.addPixmap(pic, qtg.QIcon.Disabled)
-                self.setIconSize(qtc.QSize(25, 25))
+                self.setIconSize(qtc.QSize(self.MINICONSIZE[0], self.MINICONSIZE[1]))
                 self.setIcon(icon)
                 # self.setText(self.show_value())
             else:
@@ -85,7 +97,7 @@ class Tile(qtw.QPushButton):
         self.setDisabled(True)
 
     def mousePressEvent(self, event):
-        if event.button() == qtc.Qt.RightButton:
+        if event.button() == qtc.Qt.RightButton and not self.isOnlinePlayer:
             self.flag_button()
         else:
             super().mousePressEvent(event)
@@ -93,8 +105,21 @@ class Tile(qtw.QPushButton):
     def flag_button(self):
         if self.icon().isNull():
             self.setIcon(qtg.QIcon("images/flag2.png"))
-            self.setIconSize(qtc.QSize(25, 25))
-            self.flagged.emit(True)
+            self.setIconSize(qtc.QSize(self.MINICONSIZE[0], self.MINICONSIZE[1]))
+            self.flagged.emit(True, self.get_pos())
         else:
             self.setIcon(qtg.QIcon())
-            self.flagged.emit(False)
+            self.flagged.emit(False, self.get_pos())
+
+    def adjust_size_to_difficulty(self, difficulty):
+        if difficulty == "Easy":
+            self.MINSIZE = (32, 32)
+            self.MINICONSIZE = (25, 25)
+        elif difficulty == "Normal":
+            self.MINSIZE = (21, 21)
+            self.MINICONSIZE = (17, 17)
+        else:
+            self.MINSIZE = (16, 16)
+            self.MINICONSIZE = (12, 12)
+        self.setMinimumSize(self.MINSIZE[0], self.MINSIZE[1])
+

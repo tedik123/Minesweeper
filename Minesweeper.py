@@ -11,9 +11,7 @@ from Tile import Tile
 import json
 
 
-class Minesweeper(qtw.QMainWindow):
-    path = os.getcwd()
-    os.chdir(path)
+class Minesweeper(qtw.QWidget):
     # set it to easy first!
     ROWS = 8
     COL = 10
@@ -31,14 +29,36 @@ class Minesweeper(qtw.QMainWindow):
         'Hard': (20, 24, 99)
     }
 
+    # SIGNAL CREATION
+    # a note on this, if this causes issues when running multiple instances
+    # you can subclass it to create a Qobject that contains all the signals you want, not elegant but it's a workaround
+    board_generated_event = qtc.pyqtSignal(list)
+    # this will be a list of tuples that will be the coordinates of the tiles revealed,
+    # this of course means client side trust
+    # i think that's the best way to do it, it saves having to do BFS or any other searching
+    tiles_revealed_event = qtc.pyqtSignal(list)
+    tile_flagged_event = qtc.pyqtSignal(bool, tuple)
+    # did they win and what was their time
+    game_over_event = qtc.pyqtSignal(bool, int)
+
+    #######
+
     # let's say:
     # _ = empty
     # * = bomb
     # number = number
-    def __init__(self):
+    def __init__(self, isOnlinePlayer=False):
         super().__init__()
-        self.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
-        self.setWindowTitle("Minesweeper")
+        # is onlineplayer is basically whether to make it a dummy minesweeper game that only updates from socket calls
+        self.isOnlinePlayer = isOnlinePlayer
+
+        # this will be set on manual calls since we don't need it for non-online
+        self.username = None
+        # online is if it's a multiplayer game unrelated to isOnlinePlayer
+        self.isOnline = False
+        # self.isOnlinePlayer = isOnlinePlayer
+        # self.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
+        # self.setWindowTitle("Minesweeper")
         self.board = []
         self.is_first_move = True
         self.end_game = False
@@ -46,15 +66,21 @@ class Minesweeper(qtw.QMainWindow):
         # create the main layout
         self.main_widget = qtw.QWidget()
         self.main_layout = qtw.QVBoxLayout()
-        self.main_widget.setLayout(self.main_layout)
-        self.setCentralWidget(self.main_widget)
+        # self.main_widget.setLayout(self.main_layout)
+
+        self.setLayout(self.main_layout)
+        # self.setCentralWidget(self.main_widget)
 
         # set the font stuff after the title creation
         self.create_header()
         self.create_and_set_font()
         # self.main_layout.addWidget(self.title, 1)
         self.main_layout.addWidget(self.header, 1)
-
+        # if isOnlinePlayer:
+        self.username_label = qtw.QLabel(self.username)
+        self.main_layout.addWidget(self.username_label, alignment=qtc.Qt.AlignCenter)
+        self.main_layout.setSpacing(0)
+        # self.main_layout.setContentsMargins(-5, -5, -5, -5)
         # now the actual game layout
         self.game_widget = qtw.QWidget()
         self.grid_layout = qtw.QGridLayout()
@@ -64,11 +90,16 @@ class Minesweeper(qtw.QMainWindow):
         self.main_layout.addWidget(self.game_widget, 5)
 
         self.current_difficulty = "Easy"
-        self.show()
+
+        if self.isOnlinePlayer:
+            self.difficulty_list_widget.hide()
+            self.online_timer_started = False
+        # self.show()
 
     def create_header(self):
         # header is the whole top
         self.header = qtw.QWidget()
+        self.header.setSizePolicy(qtw.QSizePolicy.Maximum, qtw.QSizePolicy.Maximum)
         self.header.setLayout(qtw.QVBoxLayout())
         self.title = qtw.QLabel("Minesweeper")
         self.header.layout().addWidget(self.title)
@@ -164,7 +195,7 @@ class Minesweeper(qtw.QMainWindow):
         for r in range(self.ROWS):
             current = []
             for c in range(self.COL):
-                tile = Tile(r, c, self.symbols['tile'])
+                tile = Tile(r, c, self.symbols['tile'], self.isOnlinePlayer)
                 # tile.clicked.connect(lambda: self.pick_spot(tile.get_pos()))
                 self.grid_layout.addWidget(tile, r, c, 1, 1)
                 tile.coords.connect(self.pick_spot)
@@ -206,41 +237,51 @@ class Minesweeper(qtw.QMainWindow):
             print(row_headers[row] + " " + string + " |||||||| " + row_headers[row] + " " + visible_string)
 
     def game_over_screen(self, isWon=False):
-        self.msg = QMessageBox()
-        self.msg.setStyleSheet("font: Impact;"
-                               "font-size: 14px;")
-        self.msg.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
-        # stop the timer
+        # this one is the dummy screens; online only
+        # if self.isOnlinePlayer:
+        #     print("HELLO")
+        #     self.online_player_game_over_screen(isWon)
         self.timer.stop()
+        # this one should be the client/local version; online only
+        if self.isOnline:
+            print("GAME OVER BUT ONLINE")
+            self.online_player_game_over_screen(isWon)
 
-        # TODO  icon if you lose and also need one if you won
-        if not isWon:
-            # self.msg.setIconPixmap(qtg.QPixmap("images/bomb_64x64.png"))
-            self.msg.setIconPixmap(qtg.QPixmap("images/mumei_sad.png"))
-            self.msg.setWindowTitle("Game Over!")
-            self.msg.setText("Game Over!")
-            self.msg.setInformativeText("Do you want to continue?")
         else:
-            # place winner icon here
-            scores = self.beat_score()
-            if scores:
-                self.msg.setTextFormat(qtc.Qt.RichText)
-                self.msg.setText(f"YOU WON!<br><br>"
-                                 f"You beat your high score of <b>{scores[0]}</b>!     <br>"
-                                 f"Your new score is <b>{scores[0]}</b>!     "
-                                 )
+            self.msg = QMessageBox()
+            self.msg.setStyleSheet("font: Impact;"
+                                   "font-size: 14px;")
+            self.msg.setWindowIcon(qtg.QIcon("images/bomb_64x64.png"))
+            # stop the timer
+
+            # TODO  icon if you lose and also need one if you won
+            if not isWon:
+                # self.msg.setIconPixmap(qtg.QPixmap("images/bomb_64x64.png"))
+                self.msg.setIconPixmap(qtg.QPixmap("images/mumei_sad.png"))
+                self.msg.setWindowTitle("Game Over!")
+                self.msg.setText("Game Over!")
+                self.msg.setInformativeText("Do you want to continue?")
             else:
-                self.msg.setText("You won!")
-            self.msg.setInformativeText("Do you want to continue?")
-            self.msg.setIconPixmap(qtg.QPixmap("images/happy.png"))
-            self.msg.setWindowTitle("You won!")
-        # self.msg.setIcon()
-        self.msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        self.msg.buttonClicked.connect(self.continue_game_check)
-        # voodoo shit to make it run
-        x = self.msg.exec_()
-        # print("chic")
-        return self.end_game
+                # place winner icon here
+                scores = self.beat_score()
+                if scores:
+                    self.msg.setTextFormat(qtc.Qt.RichText)
+                    self.msg.setText(f"YOU WON!<br><br>"
+                                     f"You beat your high score of <b>{scores[0]}</b>!     <br>"
+                                     f"Your new score is <b>{scores[0]}</b>!     "
+                                     )
+                else:
+                    self.msg.setText("You won!")
+                self.msg.setInformativeText("Do you want to continue?")
+                self.msg.setIconPixmap(qtg.QPixmap("images/happy.png"))
+                self.msg.setWindowTitle("You won!")
+            # self.msg.setIcon()
+            self.msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            self.msg.buttonClicked.connect(self.continue_game_check)
+            # voodoo shit to make it run
+            x = self.msg.exec_()
+            # print("chic")
+            return self.end_game
 
     def continue_game_check(self, i):
         # print(i.text())
@@ -303,7 +344,7 @@ class Minesweeper(qtw.QMainWindow):
                 elif self.board[row][col].get_value() != self.symbols["bomb"]:
                     self.board[row][col].set_value(self.symbols["bomb"])
                     break
-                print("SFSFSFSf")
+                # print("SFSFSFSf")
 
         # we have the bombs now we need to generate the numbers that are around bombs
         # then we need to generate the numbers that show bomb stuff
@@ -320,56 +361,65 @@ class Minesweeper(qtw.QMainWindow):
     def search_explosion(self, row, col):
         first_tile = self.board[row][col]
         first_tile.set_isVisible(True)
+        # TODO need to handle if bomb in multiplayer
         if first_tile.isBomb:
+            self.tiles_revealed_event.emit([first_tile.get_pos()])
             self.check_game_over(first_tile.isBomb)
         else:
             self.check_game_over()
         # no expansion if it's just a number, just the one
         # print(first_tile.get_value())
         if first_tile.get_value() != 0:
+            self.tiles_revealed_event.emit([first_tile.get_pos()])
             return
         queue = []
         visited = []
+        # will store the coords of the ones revealed, only used for online
+        # not sure how to do this gracefully...
+        revealed = []
         # add it to the queue and the visited
         queue.append(first_tile)
         visited.append(first_tile)
+        revealed.append(first_tile.get_pos())
         while queue:
             current_tile = queue.pop(0)
             # duck me look in every direction
             row, col = current_tile.get_pos()
             # bottom left row+1, col - 1
             if not (row + 1 >= self.ROWS) and not (col - 1 < 0):
-                self.search_explosion_helper(self.board[row + 1][col - 1], queue, visited)
+                self.search_explosion_helper(self.board[row + 1][col - 1], queue, visited, revealed)
             # left col - 1
             if not (col - 1 < 0):
-                self.search_explosion_helper(self.board[row][col - 1], queue, visited)
+                self.search_explosion_helper(self.board[row][col - 1], queue, visited, revealed)
 
             # top left row-1, col-1
             if not (row - 1 < 0) and not (col - 1 < 0):
-                self.search_explosion_helper(self.board[row - 1][col - 1], queue, visited)
+                self.search_explosion_helper(self.board[row - 1][col - 1], queue, visited, revealed)
 
             # top
             if not (row - 1 < 0):
-                self.search_explosion_helper(self.board[row - 1][col], queue, visited)
+                self.search_explosion_helper(self.board[row - 1][col], queue, visited, revealed)
 
             # top right row-1, col +1
             if not (row - 1 < 0) and not (col + 1 >= self.COL):
-                self.search_explosion_helper(self.board[row - 1][col + 1], queue, visited)
+                self.search_explosion_helper(self.board[row - 1][col + 1], queue, visited, revealed)
 
             # right row, col +1
             if not (col + 1 >= self.COL):
-                self.search_explosion_helper(self.board[row][col + 1], queue, visited)
+                self.search_explosion_helper(self.board[row][col + 1], queue, visited, revealed)
 
             # bottom right row+1, col+1
             if not (row + 1 >= self.ROWS) and not (col + 1 >= self.COL):
-                self.search_explosion_helper(self.board[row + 1][col + 1], queue, visited)
+                self.search_explosion_helper(self.board[row + 1][col + 1], queue, visited, revealed)
 
             # bottom row+1, col
             if not (row + 1 >= self.ROWS):
-                self.search_explosion_helper(self.board[row + 1][col], queue, visited)
+                self.search_explosion_helper(self.board[row + 1][col], queue, visited, revealed)
+        # need to emit the revealed tiles to the client
+        self.tiles_revealed_event.emit(revealed)
         self.check_game_over()
 
-    def search_explosion_helper(self, tile, queue, visited):
+    def search_explosion_helper(self, tile, queue, visited, revealed):
         if tile not in visited:
             visited.append(tile)
             # if it's an int it's blocking and shouldn't go further
@@ -377,6 +427,7 @@ class Minesweeper(qtw.QMainWindow):
                 return
             # only show if not a bomb
             tile.set_isVisible(True)
+            revealed.append(tile.get_pos())
             if tile.get_value() > 0:
                 return
             queue.append(tile)
@@ -388,6 +439,8 @@ class Minesweeper(qtw.QMainWindow):
                 if not self.board[row][column].isBomb:
                     self.board[row][column].set_value(self.bomb_counter_check(row, column))
             # string += "\n"
+        if self.isOnline:
+            self.emit_board()
 
     # assigns a number based on the 3x3 block range (8 blocks excluding middle) and the amount of bomb around it
     def bomb_counter_check(self, row, col):
@@ -437,13 +490,15 @@ class Minesweeper(qtw.QMainWindow):
         self.title.setAlignment(qtc.Qt.AlignCenter)
         self.setFont(self.arcade_font)
 
-    def flag_counter_update(self, didPlaceFlag):
+    def flag_counter_update(self, didPlaceFlag, coords):
         if didPlaceFlag:
             self.flag_counter -= 1
             self.flag_label.setText(f"Flag: {self.flag_counter}")
+            self.tile_flagged_event.emit(didPlaceFlag, coords)
         else:
             self.flag_counter += 1
             self.flag_label.setText(f"Flag: {self.flag_counter}")
+            self.tile_flagged_event.emit(didPlaceFlag, coords)
 
     def save_score(self):
         # load old data and append
@@ -524,3 +579,102 @@ class Minesweeper(qtw.QMainWindow):
             for pos in neighbors.keys():
                 n_row, n_col = pos
                 neighbor_tile = self.board[n_row][n_col]
+
+    def set_online(self, isOnline):
+        if isOnline:
+            self.isOnline = True
+            self.set_username("You")
+            self.difficulty_list_widget.hide()
+        else:
+            # maybe unhook signals here?
+            print("Not finished")
+
+    # this is only for online use, receives a board and sets the board to what's provided
+    def set_board(self, board):
+        for row in range(self.ROWS):
+            for column in range(self.COL):
+                self.board[row][column].set_value(board[row][column])
+        # need to update this because we don't want the board to regenerate!
+        self.is_first_move = False
+        pass
+
+    def emit_board(self):
+        # we can't pickle the tiles directly so we need to extract the values of the generated board
+        # and then send it to the server/clients
+        dummy_board = []
+        for row in range(self.ROWS):
+            current = []
+            for column in range(self.COL):
+                current.append(self.board[row][column].get_value())
+            dummy_board.append(current)
+        self.board_generated_event.emit(dummy_board)
+
+    # must be an array reveals the tiles given the coordinates
+    def show_tiles(self, tile_coords):
+        if self.isOnlinePlayer and not self.online_timer_started:
+            self.timer.start(1000)
+            self.online_timer_started = True
+        for coords in tile_coords:
+            self.board[coords[0]][coords[1]].set_isVisible(True)
+
+    def set_flagged(self, didPlaceFlag, tile_coords):
+        self.board[tile_coords[0]][tile_coords[1]].flag_button()
+
+    # emits the signal of game over to server
+    # and displays locally game over
+    def online_player_game_over_screen(self, isWon, time= None):
+        print("HERE TIME TSTOP PLEASE")
+        self.timer.stop()
+
+        self.game_widget.hide()
+        self.game_over_pic = qtw.QLabel()
+        self.game_over_container = qtw.QWidget()
+        # self.container.setSizePolicy(qtw.QSizePolicy.MinimumExpanding, qtw.QSizePolicy.MinimumExpanding)
+        self.game_over_layout = qtw.QGridLayout()
+        title_string = ""
+        self.game_over_container.setLayout(self.game_over_layout)
+        if not time:
+            time = self.timer_label.text()
+        # Emit game data for client use
+        self.game_over_event.emit(isWon, int(time))
+        if isWon:
+            title_string = "You Won!"
+            self.game_over_pic.setPixmap(qtg.QPixmap("images/happy.png").scaled(133, 160))
+
+        else:
+            title_string = "You Lost!"
+            self.game_over_pic.setPixmap(qtg.QPixmap("images/mumei_sad.png"))
+
+        self.game_over_info = qtw.QWidget()
+        self.game_over_info.setLayout(qtw.QVBoxLayout())
+        self.main_layout.addWidget(self.game_over_container)
+        self.game_over_layout.addWidget(self.game_over_pic, 1, 1)
+        self.game_over_layout.addWidget(self.game_over_info, 1, 2)
+        # self.game_over_layout.addWidget(qtw.QLabel("TITLE"), 1, 2, 1, 1)
+        # self.game_over_layout.addWidget(qtw.QLabel("Timer "), 2, 2, 1, 1)
+        # self.game_over_layout.addWidget(qtw.QLabel("Waiting for players"), 3, 2, 1, 1)
+        self.game_over_info.layout().addWidget(qtw.QLabel(f'<h1>{title_string}<h1>'))
+        self.game_over_info.layout().addWidget(qtw.QLabel(f"Timer: {time} sec(s)"))
+        waiting_label = qtw.QLabel("Waiting for other players")
+        waiting_label.setWordWrap(True)
+        self.game_over_info.layout().addWidget(waiting_label)
+        # self.game_over_layout.layout().setVerticalSpacing(0)
+        # self.game_over_layout.addStretch()
+        self.main_layout.addStretch()
+
+    def remove_online_game_over_screen(self):
+        try:
+            self.online_timer_started = False
+            self.game_over_container.hide()
+            self.game_widget.show()
+        except AttributeError:
+            print("Nothing to hide.")
+
+    def set_username(self, name):
+        self.username = name
+        self.username_label.setText(name)
+
+    def resize_to_difficulty(self):
+        for row in range(self.ROWS):
+            for column in range(self.COL):
+                self.board[row][column].adjust_size_to_difficulty(self.current_difficulty)
