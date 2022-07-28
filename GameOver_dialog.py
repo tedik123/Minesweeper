@@ -27,13 +27,14 @@ class GameOver_dialog(qtw.QDialog):
             if winner_id == client_user_id:
                 current_player_label = qtw.QLabel("You" + f" \tTime: {time}")
             else:
-                current_player_label = qtw.QLabel(player_data[winner_id]['username'] + f"Time: {time}")
+                current_player_label = qtw.QLabel(f" \tTime: {time}")
+                self.layout().addRow(str(ranking) + ". " + player_data[winner_id]['username'], current_player_label)
             self.layout().addRow(str(ranking), current_player_label)
         ranking = 1
         self.layout().addRow(qtw.QLabel('<h1>Losers</h1>'), )
         for loser_id, time in losers:
             if loser_id == client_user_id:
-                current_player_label = qtw.QLabel(f"\tTime: {time}")
+                current_player_label = qtw.QLabel(f" \tTime: {time}")
                 self.layout().addRow(str(ranking) + ". You", current_player_label)
             else:
                 current_player_label = qtw.QLabel(f" \tTime: {time}")

@@ -99,8 +99,9 @@ class Minesweeper(qtw.QWidget):
     def create_header(self):
         # header is the whole top
         self.header = qtw.QWidget()
-        self.header.setSizePolicy(qtw.QSizePolicy.Maximum, qtw.QSizePolicy.Maximum)
+        # self.header.setSizePolicy(qtw.QSizePolicy.Maximum, qtw.QSizePolicy.Maximum)
         self.header.setLayout(qtw.QVBoxLayout())
+        self.header.layout().setAlignment(qtc.Qt.AlignCenter)
         self.title = qtw.QLabel("Minesweeper")
         self.header.layout().addWidget(self.title)
         self.game_info_widget = qtw.QWidget()
@@ -117,9 +118,9 @@ class Minesweeper(qtw.QWidget):
         # self.game_info_layout.addWidget(self.diff_list, 1, 1, 1, 1)
         self.difficulty_list_widget = qtw.QWidget()
         self.difficulty_list_widget.setLayout(qtw.QVBoxLayout())
-
         self.difficulty_list_widget.layout().addWidget(self.diff_list)
-        self.game_info_layout.addWidget(self.difficulty_list_widget, 1, 1, 1, 1)
+
+        # self.difficulty_list_widget.layout().setAlignment()
         # self.timer_label = qtw.QLabel("000")
         # self.timer_label.setPicture()
         # self.timer_label.setAlignment(qtc.Qt.AlignCenter)
@@ -127,7 +128,9 @@ class Minesweeper(qtw.QWidget):
         # self.game_info_layout.addWidget(self.timer_label, 1, 2, 1, 1, alignment=qtc.Qt.AlignCenter)
 
         self.flag_label = qtw.QLabel(f"Flag: {self.flag_counter}")
-
+        #FIX ME Alignment doesn't work
+        # I probably need to put these all within a layout and then it should work...but I don't want to do that
+        self.game_info_layout.addWidget(self.difficulty_list_widget, 1, 1, 1, 1,  alignment=qtc.Qt.AlignLeft)
         self.game_info_layout.addWidget(self.create_timer(), 1, 2, 1, 1, alignment=qtc.Qt.AlignCenter)
         self.game_info_layout.addWidget(self.flag_label, 1, 3, 1, 1, alignment=qtc.Qt.AlignRight)
         self.header.layout().addWidget(self.game_info_widget)
@@ -216,6 +219,7 @@ class Minesweeper(qtw.QWidget):
         self.flag_counter = self.BOMBS
         self.flag_label.setText(f"Flag: {self.flag_counter}")
         self.timer.stop()
+        # self.header.adjustSize()
 
     def pretty_print_board(self):
         # two spaces for the buffer
