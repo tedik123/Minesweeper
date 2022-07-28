@@ -21,7 +21,7 @@ class Tile(qtw.QPushButton):
         if isOnlinePlayer:
             # this basically makes it so the dummy versions are non-interactive but doesn't make it all greyed out!
             self.blockSignals(True)
-            self.isOnlinePlayer = isOnlinePlayer
+        self.isOnlinePlayer = isOnlinePlayer
         self.clicked.connect(self.coord_signal_function)
 
         self.row = row
