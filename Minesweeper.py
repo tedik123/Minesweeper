@@ -377,6 +377,7 @@ class Minesweeper(qtw.QWidget):
             self.tiles_revealed_event.emit([first_tile.get_pos()])
             return
         queue = []
+        # todo this should absolute be a dictionary
         visited = []
         # will store the coords of the ones revealed, only used for online
         # not sure how to do this gracefully...
@@ -426,12 +427,12 @@ class Minesweeper(qtw.QWidget):
     def search_explosion_helper(self, tile, queue, visited, revealed):
         if tile not in visited:
             visited.append(tile)
-            # if it's an int it's blocking and shouldn't go further
+            # only show if not a bomb
             if tile.get_value() is self.symbols['bomb']:
                 return
-            # only show if not a bomb
             tile.set_isVisible(True)
             revealed.append(tile.get_pos())
+            # if it's an int it's blocking and shouldn't go further
             if tile.get_value() > 0:
                 return
             queue.append(tile)
