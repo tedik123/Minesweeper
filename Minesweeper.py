@@ -441,6 +441,7 @@ class Minesweeper(qtw.QWidget):
     def generate_board_numbers(self):
         for row in range(self.ROWS):
             for column in range(self.COL):
+                self.board[row][column].reveal_tile(True)
                 if not self.board[row][column].isBomb:
                     self.board[row][column].set_value(self.bomb_counter_check(row, column))
             # string += "\n"

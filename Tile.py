@@ -70,7 +70,7 @@ class Tile(qtw.QPushButton):
 
     # welp we're basically done with this function
     # just need to change it so it's appropriate to the value it actually is and if it's actually visible :shrug:
-    def reveal_tile(self):
+    def reveal_tile(self, isCheat=False):
         if self.isBomb:
             icon = qtg.QIcon()
             pic = qtg.QPixmap("images/bomb_64x64.png")
@@ -94,7 +94,9 @@ class Tile(qtw.QPushButton):
             else:
                 self.setIcon(qtg.QIcon())
                 self.setText(self.show_value())
-        self.setDisabled(True)
+
+        if not isCheat:
+            self.setDisabled(True)
 
     def mousePressEvent(self, event):
         if event.button() == qtc.Qt.RightButton and not self.isOnlinePlayer:
